@@ -1,237 +1,84 @@
-import sqlite3
-import json
-import sys
+import pytest
 import os
-import datetime
+import json
+import data_processor
 
-# --- Configuration ---
-DB_NAME = 'object_store.db'
-TABLE_NAME = 'objects'
-MEMORY_THRESHOLD_PERCENT = 170.0  # The combined memory usage limit (in percent)
-TARGET_METADATA_TYPE = 'dataset'
-REPORT_FILE = 'analysis_report.md'
-# --- End Configuration ---
+# Define the expected usage for the sample data provided in data_processor.py (50 + 75 + 40 = 165.0)
+EXPECTED_TOTAL_USAGE = 165.0
 
+# --- Setup and Teardown ---
+# Pytest fixture to ensure a clean database environment for each test
+@pytest.fixture(autouse=True)
+def setup_and_teardown():
+    # Setup: Initialize DB and insert data before each test
+    data_processor.setup_database()
+    data_processor.insert_sample_data()
+    yield  # Run the test
+    # Teardown: Clean up the database file after each test
+    if os.path.exists(data_processor.DB_NAME):
+        os.remove(data_processor.DB_NAME)
 
-def setup_database():
-    """Initializes the SQLite database and creates the objects table. Deletes existing DB for a clean run."""
-    conn = None
-    try:
-        # Check if DB file exists and delete it for a clean run
-        if os.path.exists(DB_NAME):
-            os.remove(DB_NAME)
-            print(f"Removed existing database file: {DB_NAME}")
+# --- Test Cases ---
 
-        conn = sqlite3.connect(DB_NAME)
-        cursor = conn.cursor()
-
-        print(f"Creating table '{TABLE_NAME}'...")
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                metadata TEXT,        -- Stores JSON string
-                description TEXT,
-                connections TEXT      -- Stores JSON string of connection IDs
-            );
-        """)
-        conn.commit()
-        print("Database setup complete.")
-
-    except sqlite3.Error as e:
-        print(f"Database error during setup: {e}")
-    finally:
-        if conn:
-            conn.close()
-
-
-def insert_sample_data():
-    """Inserts sample object data, including various metadata types."""
-    conn = None
-    try:
-        conn = sqlite3.connect(DB_NAME)
-        cursor = conn.cursor()
-
-        # Data to be inserted. metadata and connections are stored as JSON strings.
-        data = [
-            # Dataset A: Contributes 50%
-            ('obj-001', 'User_Activity_Log', 
-             {'type': 'dataset', 'memory_percent': 50.0, 'owner': 'team_a'},
-             'Logs user activity for auditing.', ['conn-01']),
-            
-            # Dataset B: Contributes 75%
-            ('obj-002', 'Product_Catalog', 
-             {'type': 'dataset', 'memory_percent': 75.0, 'owner': 'team_b'},
-             'Current product inventory list.', ['conn-02', 'conn-03']),
-             
-            # Tool object: Ignored in calculation
-            ('obj-003', 'ETL_Script_V2', 
-             {'type': 'tool', 'version': '2.1', 'dependencies': 3},
-             'Script for transforming user data.', ['conn-04']),
-             
-            # Dataset C: Contributes 40% (Total dataset memory will be 50 + 75 + 40 = 165.0)
-            ('obj-004', 'Sales_Metrics_EU', 
-             {'type': 'dataset', 'memory_percent': 40.0, 'owner': 'team_a'},
-             'European sales performance metrics.', []),
-
-            # Configuration object: Ignored in calculation
-            ('obj-005', 'App_Config_Dev', 
-             {'type': 'config', 'status': 'draft'},
-             'Development environment settings.', ['conn-05']),
-        ]
-
-        print("Inserting sample data...")
-        for obj_id, name, metadata_dict, description, connections_list in data:
-            # Convert Python dictionary/list to JSON string for storage
-            metadata_str = json.dumps(metadata_dict)
-            connections_str = json.dumps(connections_list)
-
-            cursor.execute(f"""
-                INSERT INTO {TABLE_NAME} (id, name, metadata, description, connections) 
-                VALUES (?, ?, ?, ?, ?);
-            """, (obj_id, name, metadata_str, description, connections_str))
-
-        conn.commit()
-        print(f"Successfully inserted {len(data)} objects.")
-
-    except sqlite3.Error as e:
-        print(f"Database error during data insertion: {e}")
-    finally:
-        if conn:
-            conn.close()
-
-
-def generate_report_file(data):
-    """Generates a detailed markdown report of the analysis results."""
+def test_database_initialization():
+    """Test that the database file is created and contains the correct number of records."""
+    conn = data_processor.sqlite3.connect(data_processor.DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute(f"SELECT COUNT(*) FROM {data_processor.TABLE_NAME};")
+    count = cursor.fetchone()[0]
+    conn.close()
     
-    # FIX: Ensure the triple-quote is correctly terminated.
-    report_content = f"""# Dataset Memory Analysis Report
-
-**Generated On:** {data['timestamp']}
-**Status:** {'FAILURE' if not data['is_compliant'] else 'SUCCESS'}
-
-## Configuration
-- Target Metadata Type: `{data['target_type']}`
-- Compliance Threshold: `{data['threshold']:.2f}%`
-
-## Results Summary
-- **Total Combined Usage:** `{data['total_usage']:.2f}%`
-- **Is Compliant:** {'Yes' if data['is_compliant'] else 'No'}
-- **Exceeded By:** `{data['exceeded_by']:.2f}%`
-
-## Details of Relevant Datasets ({len(data['datasets'])})
-
-| Object Name | Memory % |
-| :--- | :--- |
-""" # The closing triple-quote is now clearly placed here.
-    for name, percent in data['datasets']:
-        report_content += f"| {name} | {percent:.2f}% |\n"
-
-    if not data['is_compliant']:
-        report_content += "\n## Action Required\n"
-        report_content += f"The combined usage exceeds the threshold. Review the listed datasets and consider reducing their memory footprint or increasing the threshold.\n"
-
-    try:
-        with open(REPORT_FILE, 'w') as f:
-            f.write(report_content)
-        # Note: We skip printing success message here to keep console output clean for CI
-    except IOError as e:
-        print(f"Error writing report file: {e}")
-
-    return report_content
+    assert os.path.exists(data_processor.DB_NAME)
+    assert count == 5, f"Expected 5 records, but found {count}"
 
 
-def process_datasets():
+def test_analysis_success_condition():
     """
-    Queries objects, calculates sum of 'memory_percent', compares to threshold,
-    and returns a structured report object.
+    Test the scenario where the total memory usage is compliant.
+    This test relies on the threshold being set to a value > 165.0 (e.g., 170.0) 
+    in the data_processor.py file for this assertion to pass.
     """
-    conn = None
-    total_memory_percent = 0.0
-    relevant_datasets = []
-    is_compliant = False
+    # Run the analysis logic
+    result, report_data = data_processor.process_datasets()
     
-    try:
-        conn = sqlite3.connect(DB_NAME)
-        cursor = conn.cursor()
-
-        print(f"\n--- Analysis Running ---")
-        print(f"Target Type: '{TARGET_METADATA_TYPE}'")
-        print(f"Comparison Threshold: {MEMORY_THRESHOLD_PERCENT:.2f}%")
-        
-        # 1. Select all objects
-        cursor.execute(f"SELECT name, metadata FROM {TABLE_NAME};")
-        rows = cursor.fetchall()
-
-        # 2. Iterate and process
-        for name, metadata_str in rows:
-            try:
-                metadata = json.loads(metadata_str)
-                
-                if metadata.get('type') == TARGET_METADATA_TYPE:
-                    memory_percent = metadata.get('memory_percent', 0.0)
-                    total_memory_percent += memory_percent
-                    relevant_datasets.append((name, memory_percent))
-                    
-            except json.JSONDecodeError:
-                print(f"Warning: Failed to decode JSON metadata for object '{name}'. Skipping.")
-            except TypeError:
-                print(f"Warning: 'memory_percent' is not a valid number for object '{name}'. Skipping.")
-
-
-        print(f"\nFound {len(relevant_datasets)} objects of type '{TARGET_METADATA_TYPE}':")
-        for name, percent in relevant_datasets:
-            print(f"- {name}: {percent:.2f}%")
-
-        print(f"\nTotal combined memory percent: {total_memory_percent:.2f}%")
-        
-        # 3. Compare to threshold
-        if total_memory_percent > MEMORY_THRESHOLD_PERCENT:
-            exceeded_by = total_memory_percent - MEMORY_THRESHOLD_PERCENT
-            print(f"\n!!! FAILURE: The total memory percent ({total_memory_percent:.2f}%) exceeds the threshold ({MEMORY_THRESHOLD_PERCENT:.2f}%) by {exceeded_by:.2f}%.")
-            is_compliant = False
-        else:
-            exceeded_by = 0.0
-            print(f"\nSUCCESS: Total memory percent is below the threshold. System is compliant.")
-            is_compliant = True
-
-    except sqlite3.Error as e:
-        print(f"Database error during processing: {e}")
-        exceeded_by = 0.0
-        is_compliant = False
-    finally:
-        if conn:
-            conn.close()
-
-    # Prepare data structure for report generation and testing
-    report_data = {
-        'timestamp': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        'is_compliant': is_compliant,
-        'threshold': MEMORY_THRESHOLD_PERCENT,
-        'target_type': TARGET_METADATA_TYPE,
-        'total_usage': total_memory_percent,
-        'datasets': relevant_datasets,
-        'exceeded_by': exceeded_by
-    }
-    return is_compliant, report_data
-
-
-def main():
-    """Main execution function."""
-    setup_database()
-    insert_sample_data()
+    # Assert that the analysis succeeded
+    assert result is True, "Analysis should return True when total memory is compliant."
     
-    # Run the processing and capture the result and report data
-    success, report_data = process_datasets()
+    # Assert correct usage calculation
+    assert report_data['total_usage'] == EXPECTED_TOTAL_USAGE
+
+
+def test_analysis_failure_condition():
+    """
+    Test the scenario where the total memory usage is NOT compliant.
+    We temporarily set the threshold *within the test* to guarantee a failure condition.
+    """
+    # Temporarily force the threshold to a value lower than the actual usage (165.0)
+    data_processor.MEMORY_THRESHOLD_PERCENT = 100.0
     
-    # Generate the report file regardless of success or failure
-    generate_report_file(report_data)
+    # Rerun the analysis logic with the temporary low threshold
+    result, report_data = data_processor.process_datasets()
     
-    if not success:
-        # Exit with a non-zero status code to fail the CI/CD job
-        sys.exit(1)
+    # Assert that the analysis failed
+    assert result is False, "Analysis should return False when total memory exceeds the threshold."
+    assert report_data['exceeded_by'] == 65.0  # 165.0 - 100.0 = 65.0
 
 
-if __name__ == "__main__":
-    main()
+def test_report_file_generation_and_content():
+    """Test that the report file is generated and contains the expected SUCCESS status."""
+    
+    # Run the analysis logic (it should succeed if threshold is > 165.0)
+    result, report_data = data_processor.process_datasets()
+    
+    # Generate the report based on the successful result
+    report_content = data_processor.generate_report_file(report_data)
 
+    # Check that the file was created
+    assert os.path.exists(data_processor.REPORT_FILE)
+    
+    # Check for the expected SUCCESS status line (aligned with the pipeline's goal)
+    expected_status_line = '**Status:** SUCCESS'
+    assert expected_status_line in report_content, "Report status must reflect the SUCCESS condition."
+    
+    # Check that the total usage is present
+    assert 'Total Combined Usage: `165.00%`' in report_content
