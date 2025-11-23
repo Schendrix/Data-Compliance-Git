@@ -14,8 +14,6 @@ PROD_DEPLOY_DIR = 'production_release'
 // NEW: Create a versioned filename using the Jenkins BUILD_NUMBER
 // The BUILD_NUMBER is automatically injected into the 'env' map by Jenkins.
 VERSIONED_FILENAME = "data_processor_v${env.BUILD_NUMBER}.py"
-
-
 }
 
 stages {
@@ -26,59 +24,62 @@ echo 'Source code assumed checked out by Jenkins SCM.'
 }
 
 stage('Setup Environment') {
-    steps {
-        echo "Creating virtual environment and installing dependencies..."
-        // 1. Create the virtual environment using python3
-        sh "python3 -m venv ${env.VENV_DIR}"
-        
-        // 2. Install dependencies using the Python binary inside the venv
-        sh "${env.PYTHON_BIN} -m pip install -r requirements.txt"
-    }
+steps {
+echo "Creating virtual environment and installing dependencies..."
+// 1. Create the virtual environment using python3
+sh "python3 -m venv ${env.VENV_DIR}"
+
+    // 2. Install dependencies using the Python binary inside the venv
+    sh "${env.PYTHON_BIN} -m pip install -r requirements.txt"
+}
+
+
 }
 
 stage('Run Unit Tests') {
-    steps {
-        echo "Running unit tests using pytest from virtual environment..."
-        // 3. Execute pytest using the Python binary inside the venv
-        sh "${env.PYTHON_BIN} -m pytest"
-    }
+steps {
+echo "Running unit tests using pytest from virtual environment..."
+// 3. Execute pytest using the Python binary inside the venv
+sh "${env.PYTHON_BIN} -m pytest"
+}
 }
 
 stage('Run Data Analysis') {
-    steps {
-        sh """
-        echo "Starting production data analysis script..."
-        // 4. Execute the main script using the Python binary inside the venv
-        ${env.PYTHON_BIN} data_processor.py
-        """
-    }
+steps {
+sh """
+echo "Starting production data analysis script..."
+# 4. Execute the main script using the Python binary inside the venv  <-- FIX: Changed // to #
+${env.PYTHON_BIN} data_processor.py
+"""
+}
 }
 
 // --- CD STAGE: Now performs a simulated file deployment with versioning ---
 stage('Success & Deployment') {
-    when {
-        // This stage ONLY runs if the 'Run Data Analysis' stage exited with status 0 (SUCCESS/COMPLIANCE)
-        expression { currentBuild.result == 'SUCCESS' }
-    }
-    steps {
-        echo 'Compliance check PASSED. Analysis successful: All dataset memory usage is compliant with the threshold.'
-        
-        // 5. Create a simulated production directory
-        sh "mkdir -p ${env.PROD_DEPLOY_DIR}"
-        
-        // 6. ACTUAL DEPLOYMENT: Copy the artifact using the VERSIONED_FILENAME
-        sh "cp data_processor.py ${env.PROD_DEPLOY_DIR}/${env.VERSIONED_FILENAME}"
-        
-        // 7. NEW: Verification Step - List the contents of the deployment folder
-        echo 'VERIFICATION: Listing files in simulated production environment...'
-        sh "ls -l ${env.PROD_DEPLOY_DIR}/"
-        
-        // The echo confirms the deployment filename, e.g., 'data_processor_v15.py'
-        sh "echo \"CD SUCCESS: Deployed version ${env.BUILD_NUMBER} to simulated path: ${env.PROD_DEPLOY_DIR}/${env.VERSIONED_FILENAME}\""
-    }
+when {
+// This stage ONLY runs if the 'Run Data Analysis' stage exited with status 0 (SUCCESS/COMPLIANCE)
+expression { currentBuild.result == 'SUCCESS' }
+}
+steps {
+echo 'Compliance check PASSED. Analysis successful: All dataset memory usage is compliant with the threshold.'
+
+    // 5. Create a simulated production directory
+    sh "mkdir -p ${env.PROD_DEPLOY_DIR}"
+    
+    // 6. ACTUAL DEPLOYMENT: Copy the artifact using the VERSIONED_FILENAME
+    sh "cp data_processor.py ${env.PROD_DEPLOY_DIR}/${env.VERSIONED_FILENAME}"
+    
+    // 7. Verification Step - List the contents of the deployment folder
+    echo 'VERIFICATION: Listing files in simulated production environment...'
+    sh "ls -l ${env.PROD_DEPLOY_DIR}/"
+    
+    // The echo confirms the deployment filename, e.g., 'data_processor_v15.py'
+    sh "echo \"CD SUCCESS: Deployed version ${env.BUILD_NUMBER} to simulated path: ${env.PROD_DEPLOY_DIR}/${env.VERSIONED_FILENAME}\""
+}
+
+
 }
 // --- END CD STAGE ---
-
 
 } // End of stages block
 
@@ -88,19 +89,19 @@ always {
 // Archive the generated report file as a build artifact regardless of build status
 archiveArtifacts artifacts: 'analysis_report.md', onlyIfSuccessful: false
 
-    // Clean up the generated database, report file, virtual environment, and simulated production folder
-    sh 'rm -f object_store.db'
-    sh 'rm -f analysis_report.md'
-    sh "rm -rf ${env.VENV_DIR}" // Clean up the venv directory
-    sh "rm -rf ${env.PROD_DEPLOY_DIR}" // Clean up the simulated deploy directory
-    echo 'Cleanup complete.'
+// Clean up the generated database, report file, virtual environment, and simulated production folder
+sh 'rm -f object_store.db'
+sh 'rm -f analysis_report.md'
+sh "rm -rf ${env.VENV_DIR}" // Clean up the venv directory
+sh "rm -rf ${env.PROD_DEPLOY_DIR}" // Clean up the simulated deploy directory
+echo 'Cleanup complete.'
+
+
 }
 failure {
-    echo 'One or more stages failed (Tests or Data Analysis). The full report is archived as an artifact.'
+echo 'One or more stages failed (Tests or Data Analysis). The full report is archived as an artifact.'
 }
-
 
 } // End of post block
 
 }
-
