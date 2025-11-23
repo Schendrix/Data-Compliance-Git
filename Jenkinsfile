@@ -8,6 +8,14 @@ environment {
 VENV_DIR = 'venv'
 PYTHON_BIN = 'venv/bin/python3'
 ANALYTICS_LEVEL = 'CRITICAL'
+// Define a simulated deployment directory
+PROD_DEPLOY_DIR = 'production_release'
+
+// NEW: Create a versioned filename using the Jenkins BUILD_NUMBER
+// The BUILD_NUMBER is automatically injected into the 'env' map by Jenkins.
+VERSIONED_FILENAME = "data_processor_v${env.BUILD_NUMBER}.py"
+
+
 }
 
 stages {
@@ -40,22 +48,32 @@ stage('Run Data Analysis') {
     steps {
         sh """
         echo "Starting production data analysis script..."
-        # FIX: Changed Groovy comment (//) to Shell comment (#)
         # 4. Execute the main script using the Python binary inside the venv
         ${env.PYTHON_BIN} data_processor.py
         """
     }
 }
 
-stage('Reporting') {
+// --- CD STAGE: Now performs a simulated file deployment with versioning ---
+stage('Success & Deployment') {
     when {
-        // Only run this stage if the previous stage (Run Data Analysis) passed
+        // This stage ONLY runs if the 'Run Data Analysis' stage exited with status 0 (SUCCESS/COMPLIANCE)
         expression { currentBuild.result == 'SUCCESS' }
     }
     steps {
-        echo 'Analysis successful: All dataset memory usage is compliant with the threshold.'
+        echo 'Compliance check PASSED. Analysis successful: All dataset memory usage is compliant with the threshold.'
+        
+        // 5. Create a simulated production directory
+        sh "mkdir -p ${env.PROD_DEPLOY_DIR}"
+        
+        // 6. ACTUAL DEPLOYMENT: Copy the artifact using the VERSIONED_FILENAME
+        sh "cp data_processor.py ${env.PROD_DEPLOY_DIR}/${env.VERSIONED_FILENAME}"
+        
+        // The echo confirms the deployment filename, e.g., 'data_processor_v15.py'
+        sh "echo \"CD SUCCESS: Deployed version ${env.BUILD_NUMBER} to simulated path: ${env.PROD_DEPLOY_DIR}/${env.VERSIONED_FILENAME}\""
     }
 }
+// --- END CD STAGE ---
 
 
 } // End of stages block
@@ -66,10 +84,11 @@ always {
 // Archive the generated report file as a build artifact regardless of build status
 archiveArtifacts artifacts: 'analysis_report.md', onlyIfSuccessful: false
 
-    // Clean up the generated database, report file, and the virtual environment directory
+    // Clean up the generated database, report file, virtual environment, and simulated production folder
     sh 'rm -f object_store.db'
     sh 'rm -f analysis_report.md'
     sh "rm -rf ${env.VENV_DIR}" // Clean up the venv directory
+    sh "rm -rf ${env.PROD_DEPLOY_DIR}" // Clean up the simulated deploy directory
     echo 'Cleanup complete.'
 }
 failure {
@@ -78,4 +97,3 @@ failure {
 
 
 } // End of post block
-}
