@@ -100,3 +100,4 @@ echo 'One or more stages failed (Tests or Data Analysis). The full report is arc
 }
 
 } // End of post block
+} // FINAL CLOSING BRACE FOR THE PIPELINE BLOCK
