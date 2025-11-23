@@ -48,7 +48,7 @@ stage('Run Data Analysis') {
     steps {
         sh """
         echo "Starting production data analysis script..."
-        # 4. Execute the main script using the Python binary inside the venv
+        // 4. Execute the main script using the Python binary inside the venv
         ${env.PYTHON_BIN} data_processor.py
         """
     }
@@ -68,6 +68,10 @@ stage('Success & Deployment') {
         
         // 6. ACTUAL DEPLOYMENT: Copy the artifact using the VERSIONED_FILENAME
         sh "cp data_processor.py ${env.PROD_DEPLOY_DIR}/${env.VERSIONED_FILENAME}"
+        
+        // 7. NEW: Verification Step - List the contents of the deployment folder
+        echo 'VERIFICATION: Listing files in simulated production environment...'
+        sh "ls -l ${env.PROD_DEPLOY_DIR}/"
         
         // The echo confirms the deployment filename, e.g., 'data_processor_v15.py'
         sh "echo \"CD SUCCESS: Deployed version ${env.BUILD_NUMBER} to simulated path: ${env.PROD_DEPLOY_DIR}/${env.VERSIONED_FILENAME}\""
@@ -97,6 +101,3 @@ failure {
 
 
 } // End of post block
-
-}
-
