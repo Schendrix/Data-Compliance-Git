@@ -48,9 +48,6 @@ stage('Run Data Analysis') {
 steps {
 sh """
 echo "Starting production data analysis script..."
-
-Execute the main script using the Python binary inside the venv
-
 ${env.PYTHON_BIN} data_processor.py
 """
 }
