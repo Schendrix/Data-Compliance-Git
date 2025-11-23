@@ -11,11 +11,9 @@ environment {
 stages {
     stage('Checkout Code') {
         steps {
-            echo 'Checking out source code...'
-            script {
-                // In a real Jenkins environment, this step ensures your code is in the workspace
-                // For this local setup, we assume all files are present.
-            }
+            // FIX: Removed the empty 'script {}' block which caused the Groovy compilation error.
+            // When running from SCM, Jenkins automatically checks out the code before the pipeline starts.
+            echo 'Source code assumed checked out by Jenkins SCM.'
         }
     }
 
