@@ -7,7 +7,7 @@ import datetime
 # --- Configuration ---
 DB_NAME = 'object_store.db'
 TABLE_NAME = 'objects'
-MEMORY_THRESHOLD_PERCENT = 150.0  # The combined memory usage limit (in percent)
+MEMORY_THRESHOLD_PERCENT = 170.0  # The combined memory usage limit (in percent)
 TARGET_METADATA_TYPE = 'dataset'
 REPORT_FILE = 'analysis_report.md'
 # --- End Configuration ---
@@ -234,3 +234,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
