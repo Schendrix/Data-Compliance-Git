@@ -29,10 +29,11 @@ echo "Creating virtual environment and installing dependencies..."
 // 1. Create the virtual environment using python3
 sh "python3 -m venv ${env.VENV_DIR}"
 
-    // 2. Install dependencies using the Python binary inside the venv
-    sh "${env.PYTHON_BIN} -m pip install -r requirements.txt"
-}
+// 2. Install dependencies using the Python binary inside the venv
+sh "${env.PYTHON_BIN} -m pip install -r requirements.txt"
 
+
+}
 
 }
 
@@ -48,7 +49,9 @@ stage('Run Data Analysis') {
 steps {
 sh """
 echo "Starting production data analysis script..."
-# 4. Execute the main script using the Python binary inside the venv  <-- FIX: Changed // to #
+
+4. Execute the main script using the Python binary inside the venv  <-- FIX: Changed // to
+
 ${env.PYTHON_BIN} data_processor.py
 """
 }
@@ -56,10 +59,8 @@ ${env.PYTHON_BIN} data_processor.py
 
 // --- CD STAGE: Now performs a simulated file deployment with versioning ---
 stage('Success & Deployment') {
-when {
-// This stage ONLY runs if the 'Run Data Analysis' stage exited with status 0 (SUCCESS/COMPLIANCE)
-expression { currentBuild.result == 'SUCCESS' }
-}
+// FIX: Removing the unnecessary 'when' conditional.
+// This stage will now run automatically because the previous stages succeeded.
 steps {
 echo 'Compliance check PASSED. Analysis successful: All dataset memory usage is compliant with the threshold.'
 
@@ -95,7 +96,6 @@ sh 'rm -f analysis_report.md'
 sh "rm -rf ${env.VENV_DIR}" // Clean up the venv directory
 sh "rm -rf ${env.PROD_DEPLOY_DIR}" // Clean up the simulated deploy directory
 echo 'Cleanup complete.'
-
 
 }
 failure {
