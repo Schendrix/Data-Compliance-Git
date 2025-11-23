@@ -1,17 +1,12 @@
 import pytest
 import os
 import json
-import data_processor # This imports the entire module
-# The traceback indicates this line was present and causing the error, 
-# but it is not visible in the provided file content. It is removed here 
-# to ensure we don't try to import functions that are not explicitly defined
-# in the import statement.
+import data_processor # Only import the module, not specific functions
 
 # Define the expected usage for the sample data provided in data_processor.py (50 + 75 + 40 = 165.0)
 EXPECTED_TOTAL_USAGE = 165.0
 
 # --- Setup and Teardown ---
-# Pytest fixture to ensure a clean database environment for each test
 @pytest.fixture(autouse=True)
 def setup_and_teardown():
     # Setup: Initialize DB and insert data before each test
@@ -26,7 +21,6 @@ def setup_and_teardown():
 
 def test_database_initialization():
     """Test that the database file is created and contains the correct number of records."""
-    # Use data_processor.sqlite3 for connection
     conn = data_processor.sqlite3.connect(data_processor.DB_NAME)
     cursor = conn.cursor()
     cursor.execute(f"SELECT COUNT(*) FROM {data_processor.TABLE_NAME};")
@@ -40,8 +34,7 @@ def test_database_initialization():
 def test_analysis_success_condition():
     """
     Test the scenario where the total memory usage is compliant.
-    This test relies on the threshold being set to a value > 165.0 (e.g., 170.0) 
-    in the data_processor.py file for this assertion to pass.
+    (Relies on MEMORY_THRESHOLD_PERCENT being > 165.0 in data_processor.py)
     """
     # Run the analysis logic
     result, report_data = data_processor.process_datasets()
@@ -59,6 +52,8 @@ def test_analysis_failure_condition():
     We temporarily set the threshold *within the test* to guarantee a failure condition.
     """
     # Temporarily force the threshold to a value lower than the actual usage (165.0)
+    # We save the original value to restore it, though Pytest fixtures should handle cleanup.
+    original_threshold = data_processor.MEMORY_THRESHOLD_PERCENT
     data_processor.MEMORY_THRESHOLD_PERCENT = 100.0
     
     # Rerun the analysis logic with the temporary low threshold
@@ -67,6 +62,9 @@ def test_analysis_failure_condition():
     # Assert that the analysis failed
     assert result is False, "Analysis should return False when total memory exceeds the threshold."
     assert report_data['exceeded_by'] == 65.0  # 165.0 - 100.0 = 65.0
+    
+    # Restore original threshold (as good practice)
+    data_processor.MEMORY_THRESHOLD_PERCENT = original_threshold
 
 
 def test_report_file_generation_and_content():
