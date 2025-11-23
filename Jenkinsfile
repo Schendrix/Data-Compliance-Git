@@ -32,7 +32,6 @@ sh "python3 -m venv ${env.VENV_DIR}"
 // 2. Install dependencies using the Python binary inside the venv
 sh "${env.PYTHON_BIN} -m pip install -r requirements.txt"
 
-
 }
 
 }
@@ -50,7 +49,7 @@ steps {
 sh """
 echo "Starting production data analysis script..."
 
-4. Execute the main script using the Python binary inside the venv  <-- FIX: Changed // to
+Execute the main script using the Python binary inside the venv <-- CLEANED COMMENT
 
 ${env.PYTHON_BIN} data_processor.py
 """
@@ -64,20 +63,19 @@ stage('Success & Deployment') {
 steps {
 echo 'Compliance check PASSED. Analysis successful: All dataset memory usage is compliant with the threshold.'
 
-    // 5. Create a simulated production directory
-    sh "mkdir -p ${env.PROD_DEPLOY_DIR}"
-    
-    // 6. ACTUAL DEPLOYMENT: Copy the artifact using the VERSIONED_FILENAME
-    sh "cp data_processor.py ${env.PROD_DEPLOY_DIR}/${env.VERSIONED_FILENAME}"
-    
-    // 7. Verification Step - List the contents of the deployment folder
-    echo 'VERIFICATION: Listing files in simulated production environment...'
-    sh "ls -l ${env.PROD_DEPLOY_DIR}/"
-    
-    // The echo confirms the deployment filename, e.g., 'data_processor_v15.py'
-    sh "echo \"CD SUCCESS: Deployed version ${env.BUILD_NUMBER} to simulated path: ${env.PROD_DEPLOY_DIR}/${env.VERSIONED_FILENAME}\""
-}
+// 5. Create a simulated production directory
+sh "mkdir -p ${env.PROD_DEPLOY_DIR}"
 
+// 6. ACTUAL DEPLOYMENT: Copy the artifact using the VERSIONED_FILENAME
+sh "cp data_processor.py ${env.PROD_DEPLOY_DIR}/${env.VERSIONED_FILENAME}"
+
+// 7. Verification Step - List the contents of the deployment folder
+echo 'VERIFICATION: Listing files in simulated production environment...'
+sh "ls -l ${env.PROD_DEPLOY_DIR}/"
+
+// The echo confirms the deployment filename, e.g., 'data_processor_v15.py'
+sh "echo "CD SUCCESS: Deployed version ${env.BUILD_NUMBER} to simulated path: ${env.PROD_DEPLOY_DIR}/${env.VERSIONED_FILENAME}""
+}
 
 }
 // --- END CD STAGE ---
@@ -103,5 +101,3 @@ echo 'One or more stages failed (Tests or Data Analysis). The full report is arc
 }
 
 } // End of post block
-
-}
