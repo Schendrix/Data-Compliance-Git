@@ -52,7 +52,6 @@ def test_analysis_failure_condition():
     We temporarily set the threshold *within the test* to guarantee a failure condition.
     """
     # Temporarily force the threshold to a value lower than the actual usage (165.0)
-    # We save the original value to restore it, though Pytest fixtures should handle cleanup.
     original_threshold = data_processor.MEMORY_THRESHOLD_PERCENT
     data_processor.MEMORY_THRESHOLD_PERCENT = 100.0
     
@@ -79,9 +78,10 @@ def test_report_file_generation_and_content():
     # Check that the file was created
     assert os.path.exists(data_processor.REPORT_FILE)
     
-    # Check for the expected SUCCESS status line (aligned with the pipeline's goal)
+    # Check for the expected SUCCESS status line
     expected_status_line = '**Status:** SUCCESS'
     assert expected_status_line in report_content, "Report status must reflect the SUCCESS condition."
     
-    # Check that the total usage is present
-    assert 'Total Combined Usage: `165.00%`' in report_content
+    # FIX: Assert the presence of the full formatted line, including the list marker (-) and bold (**)
+    expected_usage_line = f"- **Total Combined Usage:** `{EXPECTED_TOTAL_USAGE:.2f}%`"
+    assert expected_usage_line in report_content
