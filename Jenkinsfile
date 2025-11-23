@@ -20,16 +20,16 @@ stages {
     stage('Install Dependencies') {
         steps {
             echo 'Installing Python dependencies from requirements.txt...'
-            // Using 'python -m pip' is more robust than just 'pip'
-            sh 'python -m pip install -r requirements.txt'
+            // FIX: Explicitly using 'python3' for reliability.
+            sh 'python3 -m pip install -r requirements.txt'
         }
     }
 
     stage('Run Unit Tests') {
         steps {
             echo "Running unit tests using pytest..."
-            // Using 'python -m pytest' is more robust than just 'pytest'
-            sh 'python -m pytest'
+            // FIX: Explicitly using 'python3' for reliability.
+            sh 'python3 -m pytest'
         }
     }
 
@@ -37,8 +37,9 @@ stages {
         steps {
             sh """
             echo "Starting production data analysis script..."
+            // FIX: Explicitly using 'python3' to execute the script.
             // Run the script. If it exits with status 1 (due to threshold failure), the build will fail.
-            python data_processor.py
+            python3 data_processor.py
             """
         }
     }
