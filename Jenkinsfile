@@ -49,7 +49,7 @@ steps {
 sh """
 echo "Starting production data analysis script..."
 
-Execute the main script using the Python binary inside the venv <-- CLEANED COMMENT
+Execute the main script using the Python binary inside the venv
 
 ${env.PYTHON_BIN} data_processor.py
 """
@@ -58,7 +58,6 @@ ${env.PYTHON_BIN} data_processor.py
 
 // --- CD STAGE: Now performs a simulated file deployment with versioning ---
 stage('Success & Deployment') {
-// FIX: Removing the unnecessary 'when' conditional.
 // This stage will now run automatically because the previous stages succeeded.
 steps {
 echo 'Compliance check PASSED. Analysis successful: All dataset memory usage is compliant with the threshold.'
@@ -73,8 +72,8 @@ sh "cp data_processor.py ${env.PROD_DEPLOY_DIR}/${env.VERSIONED_FILENAME}"
 echo 'VERIFICATION: Listing files in simulated production environment...'
 sh "ls -l ${env.PROD_DEPLOY_DIR}/"
 
-// The echo confirms the deployment filename, e.g., 'data_processor_v15.py'
-sh "echo "CD SUCCESS: Deployed version ${env.BUILD_NUMBER} to simulated path: ${env.PROD_DEPLOY_DIR}/${env.VERSIONED_FILENAME}""
+// FIX: Changed quoting from double quotes to single quotes to prevent Groovy parsing error.
+sh "echo 'CD SUCCESS: Deployed version ${env.BUILD_NUMBER} to simulated path: ${env.PROD_DEPLOY_DIR}/${env.VERSIONED_FILENAME}'"
 }
 
 }
@@ -101,5 +100,3 @@ echo 'One or more stages failed (Tests or Data Analysis). The full report is arc
 }
 
 } // End of post block
-
-}
